@@ -4,6 +4,7 @@ import plotly.express as px
 import extra_streamlit_components as stx
 import datetime
 from sqlalchemy import create_engine, text
+import time
 
 # --- 3. CONFIGURACIÓN DE STREAMLIT (Debe ser el primer comando siempre) ---
 st.set_page_config(page_title="Mis Finanzas", page_icon="💰", layout="wide")
@@ -48,7 +49,11 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
                     st.session_state['logeado'] = True
                     vencimiento = datetime.datetime.now() + datetime.timedelta(days=30)
                     cookie_manager.set("sesion_finanzas", "activa", expires_at=vencimiento)
-                    st.rerun()
+                    
+                    # --- PAUSA PARA EVITAR EL LOGOUT AL HACER REFRESH ---
+                    st.success("¡Sello guardado! Iniciando sesión...")
+                    time.sleep(1.5) # Obligamos a Python a esperar 1.5 segundos
+                    st.rerun()      # Ahora sí, reiniciamos
                 else:
                     st.error("Credenciales incorrectas")
     
