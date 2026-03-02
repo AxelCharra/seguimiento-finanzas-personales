@@ -33,16 +33,19 @@ if usuario_cookie is not None and usuario_cookie != "":
     st.session_state['usuario_actual'] = usuario_cookie
 
 if 'logeado' not in st.session_state or not st.session_state['logeado']:
-    st.title("🔒 Acceso Restringido")
-    st.warning("Por favor, iniciá sesión para ver tus Finanzas.")
-    
+    # Creamos las columnas primero
     col1, col2, col3 = st.columns([1, 2, 1])
+    
     with col2:
+        # Usamos Markdown con HTML para forzar el centrado
+        st.markdown("<h2 style='text-align: center;'>🔒 Acceso Restringido</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #FF4B4B;'>Por favor, iniciá sesión para ver tus Finanzas.</p>", unsafe_allow_html=True)
+        
         with st.form("login_form"):
             usuario = st.text_input("Usuario")
             password = st.text_input("Contraseña", type="password")
             submit = st.form_submit_button("Entrar")
-
+            
             if submit:
                 if usuario in st.secrets["credenciales"] and st.secrets["credenciales"][usuario] == password:
                     st.session_state['logeado'] = True
