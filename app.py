@@ -6,19 +6,14 @@ import datetime
 from sqlalchemy import create_engine, text
 import time
 
-# --- 3. CONFIGURACIÓN DE STREAMLIT (Debe ser el primer comando siempre) ---
+# --- 1. CONFIGURACIÓN DE STREAMLIT ---
 st.set_page_config(page_title="Mis Finanzas", page_icon="💰", layout="wide")
 
-# --- 1. CONFIGURACIÓN DE LA BASE DE DATOS (EL PUENTE) ---
+# --- 1.1. CONFIGURACIÓN DE LA BASE DE DATOS ---
 DB_URI = st.secrets["DB_URI"]
 engine = create_engine(DB_URI)
 
-# --- 2. LOS DICCIONARIOS TRADUCTORES ---
-dict_cuentas = {
-    "Efectivo": 1, "Transferencia": 2, "MercadoPago": 3, 
-    "Débito": 4, "Crédito": 5
-}
-
+dict_cuentas = {"Efectivo": 1, "Transferencia": 2, "MercadoPago": 3, "Débito": 4, "Crédito": 5}
 dict_categorias = {
     "Sueldo": 1, "Rendimientos": 2, "Ventas": 3, "Otros Ingresos": 4,
     "Supermercado": 5, "Alquiler": 6, "Gimnasio": 7, "Ocio": 8, 
@@ -26,12 +21,15 @@ dict_categorias = {
     "Otros Egresos": 12, "Inversiones": 13, "Verdulería": 14, "Indumentaria": 15
 }
 
-# --- SISTEMA DE LOGIN (GATEKEEPER CON COOKIES) ---
+# --- 3. SISTEMA DE LOGIN (GATEKEEPER) ---
 cookie_manager = stx.CookieManager()
 estado_cookie = cookie_manager.get(cookie="sesion_finanzas")
+usuario_cookie = cookie_manager.get(cookie="usuario_finanzas") # LEEMOS EL NOMBRE TAMBIÉN
 
-if estado_cookie == "activa":
+# Si hay sesión Y sabemos quién es, lo dejamos pasar directamente
+if estado_cookie == "activa" and usuario_cookie is not None:
     st.session_state['logeado'] = True
+    st.session_state['usuario_actual'] = usuario_cookie
 
 if 'logeado' not in st.session_state or not st.session_state['logeado']:
     st.title("🔒 Acceso Restringido")
@@ -45,27 +43,29 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
             submit = st.form_submit_button("Entrar")
 
             if submit:
-                if usuario == st.secrets["admin_user"] and password == st.secrets["admin_password"]:
+                if usuario in st.secrets["credenciales"] and st.secrets["credenciales"][usuario] == password:
                     st.session_state['logeado'] = True
+                    st.session_state['usuario_actual'] = usuario 
+                    
                     vencimiento = datetime.datetime.now() + datetime.timedelta(days=30)
                     cookie_manager.set("sesion_finanzas", "activa", expires_at=vencimiento)
+                    cookie_manager.set("usuario_finanzas", usuario, expires_at=vencimiento) 
                     
-                    # --- PAUSA PARA EVITAR EL LOGOUT AL HACER REFRESH ---
-                    st.success("¡Sello guardado! Iniciando sesión...")
-                    time.sleep(1.5) # Obligamos a Python a esperar 1.5 segundos
-                    st.rerun()      # Ahora sí, reiniciamos
+                    st.success(f"¡Bienvenido/a {usuario}! Abriendo la bóveda...")
+                    time.sleep(1.5)
+                    st.rerun()
                 else:
                     st.error("Credenciales incorrectas")
     
-    st.stop() # 🛑 El escudo final: si no logueaste, la app muere acá.
+    st.stop()
 
-# --- APP PRINCIPAL (SOLO SE LLEGA ACÁ SI EL USUARIO TIENE LA COOKIE O INICIÓ SESIÓN) ---
+# --- APP PRINCIPAL ---
 
-# Botón de cierre de sesión en la barra lateral
-st.sidebar.title("Bienvenido/a 👋")
+st.sidebar.title(f"Bienvenido/a 👋 {st.session_state['usuario_actual'].capitalize()}")
 if st.sidebar.button("Cerrar Sesión"):
     st.session_state['logeado'] = False
-    cookie_manager.delete("sesion_finanzas") # Borramos la cookie al salir
+    cookie_manager.delete("sesion_finanzas")
+    cookie_manager.delete("usuario_finanzas") 
     st.rerun()
 
 st.title("💸 Seguimiento de Finanzas Personales")
@@ -73,7 +73,6 @@ st.divider()
 
 # --- 4. FORMULARIO DE CARGA ---
 st.subheader("Carga una nueva transacción")
-
 opcion_seleccionada = st.radio("Tipo de Movimiento", ["🔴 Egreso", "🟢 Ingreso"], horizontal=True)
 tipo_movimiento = "Ingreso" if "Ingreso" in opcion_seleccionada else "Egreso"
 
@@ -86,16 +85,13 @@ else:
 
 with st.form("formulario_transacciones", clear_on_submit=True):
     col1, col2 = st.columns(2)
-    
     with col1:
         fecha = st.date_input("Fecha de la transacción", format="DD/MM/YYYY")
         cuenta = st.selectbox("Cuenta", list(dict_cuentas.keys()))
         categoria = st.selectbox("Categoría", categorias_disponibles)
-        
     with col2:
         monto = st.number_input("Monto ($)", min_value=0.0, value=None, format="%.2f")
         detalle = st.text_input("Detalle (Opcional)", placeholder="Ej: Cena con amigos")
-
     boton_guardar = st.form_submit_button("Guardar Transacción")
 
 # --- 5. LÓGICA DE INYECCIÓN A SQL ---
@@ -107,66 +103,50 @@ if boton_guardar:
         id_categoria = dict_categorias[categoria]
         
         query_insert = text("""
-            INSERT INTO Fact_Transacciones (Fecha, ID_Cuenta_Origen, ID_Categoria, Monto, Detalle)
-            VALUES (:fecha, :id_cuenta, :id_categoria, :monto, :detalle)
+            INSERT INTO Fact_Transacciones (Fecha, ID_Cuenta_Origen, ID_Categoria, Monto, Detalle, usuario)
+            VALUES (:fecha, :id_cuenta, :id_categoria, :monto, :detalle, :usuario_actual)
         """)
-        
         try:
             with engine.connect() as conn:
                 conn.execute(query_insert, {
-                    "fecha": fecha, 
-                    "id_cuenta": id_cuenta, 
-                    "id_categoria": id_categoria, 
-                    "monto": monto, 
-                    "detalle": detalle
+                    "fecha": fecha, "id_cuenta": id_cuenta, "id_categoria": id_categoria, 
+                    "monto": monto, "detalle": detalle, "usuario_actual": st.session_state['usuario_actual']
                 })
                 conn.commit()
-            st.success(f"¡Éxito! Transacción guardada directamente en PostgreSQL.")
+            st.success(f"¡Éxito! Transacción guardada en tu cuenta.")
         except Exception as e:
-            st.error(f"Error al guardar en la base de datos: {e}")
+            st.error(f"Error al guardar: {e}")
 
 st.divider()
 
-# --- 6. DASHBOARD (LEYENDO DESDE SQL) ---
+# --- 6. DASHBOARD ---
 st.subheader("📊 Resumen Financiero")
 
-query_lectura = """
+query_lectura = text("""
     SELECT 
-        f.ID_Transaccion AS "ID",
-        f.Fecha AS "Fecha", 
-        c.Tipo_Movimiento AS "Tipo_Movimiento", 
-        c.Categoria_Principal AS "Categoria", 
-        cu.Nombre_Cuenta AS "Cuenta", 
-        f.Monto AS "Monto", 
-        f.Detalle AS "Detalle"
+        f.ID_Transaccion AS "ID", f.Fecha AS "Fecha", c.Tipo_Movimiento AS "Tipo_Movimiento", 
+        c.Categoria_Principal AS "Categoria", cu.Nombre_Cuenta AS "Cuenta", 
+        f.Monto AS "Monto", f.Detalle AS "Detalle"
     FROM Fact_Transacciones f
     JOIN Dim_Categorias c ON f.ID_Categoria = c.ID_Categoria
     LEFT JOIN Dim_Cuentas cu ON f.ID_Cuenta_Origen = cu.ID_Cuenta
+    WHERE f.usuario = :usuario_actual
     ORDER BY f.Fecha DESC
-"""
+""")
 
 try:
-    df_historial = pd.read_sql(query_lectura, engine)
+    df_historial = pd.read_sql(query_lectura, engine, params={"usuario_actual": st.session_state['usuario_actual']})
     
     if not df_historial.empty:
         df_historial["Fecha"] = pd.to_datetime(df_historial["Fecha"]).dt.date
         
         st.sidebar.header("🔍 Filtros de Análisis")
-        
         fecha_min = df_historial["Fecha"].min()
         fecha_max = df_historial["Fecha"].max()
-        
-        rango_fechas = st.sidebar.date_input(
-            "Seleccionar período",
-            value=(fecha_min, fecha_max),
-            min_value=fecha_min,
-            max_value=fecha_max,
-            format="DD/MM/YYYY"
-        )
+        rango_fechas = st.sidebar.date_input("Seleccionar período", value=(fecha_min, fecha_max), min_value=fecha_min, max_value=fecha_max, format="DD/MM/YYYY")
         
         if len(rango_fechas) == 2:
-            fecha_inicio, fecha_fin = rango_fechas
-            mask = (df_historial["Fecha"] >= fecha_inicio) & (df_historial["Fecha"] <= fecha_fin)
+            mask = (df_historial["Fecha"] >= rango_fechas[0]) & (df_historial["Fecha"] <= rango_fechas[1])
             df_filtrado = df_historial.loc[mask]
         else:
             df_filtrado = df_historial[df_historial["Fecha"] == rango_fechas[0]]
@@ -174,7 +154,6 @@ try:
         if not df_filtrado.empty:
             df_ingresos = df_filtrado[df_filtrado["Tipo_Movimiento"] == "Ingreso"]
             df_egresos = df_filtrado[df_filtrado["Tipo_Movimiento"] == "Egreso"]
-            
             total_ingresos = df_ingresos["Monto"].sum()
             total_egresos = df_egresos["Monto"].sum()
             saldo_actual = total_ingresos - total_egresos
@@ -186,15 +165,12 @@ try:
             
             st.divider()
             st.subheader("📉 Análisis de Gastos")
-            
             if not df_egresos.empty:
                 gastos_por_categoria = df_egresos.groupby("Categoria")["Monto"].sum().reset_index()
                 col_graf1, col_graf2 = st.columns(2)
-                
                 with col_graf1:
                     fig_bar = px.bar(gastos_por_categoria, x="Categoria", y="Monto", color="Categoria", title="Volumen de Gastos")
                     st.plotly_chart(fig_bar, width="stretch")
-                    
                 with col_graf2:
                     fig_pie = px.pie(gastos_por_categoria, names="Categoria", values="Monto", color="Categoria", title="Distribución (%)", hole=0.4)
                     st.plotly_chart(fig_pie, width="stretch")
@@ -207,17 +183,13 @@ try:
         else:
             st.warning("No hay transacciones para el rango de fechas seleccionado.")
             
-        # --- 7. ZONA DE PELIGRO (BORRAR REGISTROS) ---
+        # --- 7. ZONA DE PELIGRO BLINDADA ---
         st.divider()
         st.subheader("🗑️ Gestión de Errores")
-        st.info("💡 Si cargaste algo mal, buscá su número de 'ID' en la tabla de arriba y eliminalo acá.")
-        
         with st.expander("Abrir panel de eliminación"):
             col_borrar1, col_borrar2 = st.columns([3, 1])
-            
             with col_borrar1:
                 id_a_borrar = st.number_input("Ingresá el ID a eliminar:", min_value=1, step=1, value=None)
-            
             with col_borrar2:
                 st.write("") 
                 st.write("")
@@ -227,17 +199,22 @@ try:
                 if id_a_borrar is None:
                     st.error("Ingresá un ID válido.")
                 else:
-                    query_delete = text("DELETE FROM Fact_Transacciones WHERE ID_Transaccion = :id")
+                    # BLINDAJE: Solo borra si el ID existe Y le pertenece al usuario actual
+                    query_delete = text("DELETE FROM Fact_Transacciones WHERE ID_Transaccion = :id AND usuario = :usuario_actual")
                     try:
                         with engine.connect() as conn:
-                            conn.execute(query_delete, {"id": id_a_borrar})
+                            resultado = conn.execute(query_delete, {"id": id_a_borrar, "usuario_actual": st.session_state['usuario_actual']})
                             conn.commit()
-                        st.success(f"¡Registro {id_a_borrar} fulminado! Recargá la página (F5) para actualizar los saldos.")
+                            
+                            # Verificamos si realmente se borró algo
+                            if resultado.rowcount > 0:
+                                st.success(f"¡Registro {id_a_borrar} eliminado! Recargá la página (F5).")
+                            else:
+                                st.error("No se encontró ese ID o no tenés permiso para borrarlo.")
                     except Exception as e:
                         st.error(f"Error al intentar borrar: {e}")
-
     else:
-        st.info("La base de datos PostgreSQL está conectada, pero aún no tiene transacciones. ¡Cargá la primera!")
+        st.info(f"Hola {st.session_state['usuario_actual'].capitalize()}, aún no tenés transacciones. ¡Cargá la primera!")
 
 except Exception as e:
-    st.error(f"No se pudo conectar a PostgreSQL para leer los datos. Revisá la contraseña. Detalles: {e}")
+    st.error(f"No se pudo conectar a la base de datos. Detalles: {e}")
