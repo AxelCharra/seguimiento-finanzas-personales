@@ -21,13 +21,14 @@ dict_categorias = {
     "Otros Egresos": 12, "Inversiones": 13, "Verdulería": 14, "Indumentaria": 15
 }
 
-# --- 3. SISTEMA DE LOGIN (GATEKEEPER) ---
+# --- 3. SISTEMA DE LOGIN (GATEKEEPER OPTIMIZADO) ---
 cookie_manager = stx.CookieManager()
-estado_cookie = cookie_manager.get(cookie="sesion_finanzas")
-usuario_cookie = cookie_manager.get(cookie="usuario_finanzas") # LEEMOS EL NOMBRE TAMBIÉN
 
-# Si hay sesión Y sabemos quién es, lo dejamos pasar directamente
-if estado_cookie == "activa" and usuario_cookie is not None:
+# Solo leemos la cookie del usuario
+usuario_cookie = cookie_manager.get(cookie="usuario_finanzas")
+
+# Si la cookie existe y tiene un nombre, automáticamente está logueado
+if usuario_cookie is not None and usuario_cookie != "":
     st.session_state['logeado'] = True
     st.session_state['usuario_actual'] = usuario_cookie
 
@@ -48,7 +49,8 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
                     st.session_state['usuario_actual'] = usuario 
                     
                     vencimiento = datetime.datetime.now() + datetime.timedelta(days=30)
-                    cookie_manager.set("sesion_finanzas", "activa", expires_at=vencimiento)
+                    
+                    # MAGIA: Usamos UNA SOLA cookie que cumple ambas funciones
                     cookie_manager.set("usuario_finanzas", usuario, expires_at=vencimiento) 
                     
                     st.success(f"¡Bienvenido/a {usuario}! Abriendo la bóveda...")
@@ -57,18 +59,18 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
                 else:
                     st.error("Credenciales incorrectas")
     
-    st.stop()
+    st.stop() # 🛑 El escudo final
 
 # --- APP PRINCIPAL ---
 
 st.sidebar.title(f"Bienvenido/a 👋 {st.session_state['usuario_actual'].capitalize()}")
 if st.sidebar.button("Cerrar Sesión"):
     st.session_state['logeado'] = False
-    cookie_manager.delete("sesion_finanzas")
-    cookie_manager.delete("usuario_finanzas") 
+    cookie_manager.delete("usuario_finanzas") # Borramos la única cookie al salir
     st.rerun()
 
 st.title("💸 Seguimiento de Finanzas Personales")
+
 st.divider() 
 
 # --- 4. FORMULARIO DE CARGA ---
