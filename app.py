@@ -53,7 +53,7 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
                     # MAGIA: Usamos UNA SOLA cookie que cumple ambas funciones
                     cookie_manager.set("usuario_finanzas", usuario, expires_at=vencimiento) 
                     
-                    st.success(f"¡Bienvenido/a {usuario}! Abriendo la bóveda...")
+                    st.success(f"¡Bienvenido/a {usuario}! cargando tus finanzas...")
                     time.sleep(1.5)
                     st.rerun()
                 else:
