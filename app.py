@@ -91,7 +91,12 @@ else:
 with st.form("formulario_transacciones", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
-        fecha = st.date_input("Fecha de la transacción", format="DD/MM/YYYY")
+        # 1. Definimos el huso horario de Argentina (UTC-3)
+        zona_ar = datetime.timezone(datetime.timedelta(hours=-3))
+        # 2. Calculamos el "hoy" pero forzando esa zona horaria
+        hoy_arg = datetime.datetime.now(zona_ar).date()
+        # 3. Le pasamos ese "hoy_arg" como valor (value) por defecto al calendario
+        fecha = st.date_input("Fecha de la transacción", value=hoy_arg, format="DD/MM/YYYY")
         cuenta = st.selectbox("Cuenta", list(dict_cuentas.keys()))
         categoria = st.selectbox("Categoría", categorias_disponibles)
     with col2:
