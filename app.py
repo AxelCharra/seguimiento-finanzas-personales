@@ -13,12 +13,14 @@ st.set_page_config(page_title="Mis Finanzas", page_icon="💰", layout="wide")
 DB_URI = st.secrets["DB_URI"]
 engine = create_engine(DB_URI)
 
+# --- 2. Diccionario
 dict_cuentas = {"Efectivo": 1, "Transferencia": 2, "MercadoPago": 3, "Débito": 4, "Crédito": 5}
 dict_categorias = {
     "Sueldo": 1, "Rendimientos": 2, "Ventas": 3, "Otros Ingresos": 4,
     "Supermercado": 5, "Alquiler": 6, "Gimnasio": 7, "Ocio": 8, 
     "Entretenimiento": 9, "Gustitos": 10, "Bolucompras": 11,
-    "Otros Egresos": 12, "Inversiones": 13, "Verdulería": 14, "Indumentaria": 15
+    "Otros Egresos": 12, "Inversiones": 13, "Verdulería": 14, "Indumentaria": 15,
+    "Servicios": 16
 }
 
 # --- 3. SISTEMA DE LOGIN (GATEKEEPER OPTIMIZADO) ---
@@ -86,7 +88,7 @@ if tipo_movimiento == "Ingreso":
     categorias_disponibles = ["Sueldo", "Rendimientos", "Ventas", "Otros Ingresos"]
 else:
     st.markdown("<h4 style='color: #dc3545;'>📉 Registrando un Egreso</h4>", unsafe_allow_html=True)
-    categorias_disponibles = ["Supermercado", "Alquiler", "Gimnasio", "Ocio", "Entretenimiento", "Gustitos", "Bolucompras", "Otros Egresos", "Inversiones", "Verdulería", "Indumentaria"]
+    categorias_disponibles = ["Supermercado", "Alquiler", "Servicios", "Gimnasio", "Ocio", "Entretenimiento", "Gustitos", "Bolucompras", "Otros Egresos", "Inversiones", "Verdulería", "Indumentaria"]
 
 with st.form("formulario_transacciones", clear_on_submit=True):
     col1, col2 = st.columns(2)
