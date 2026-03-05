@@ -195,14 +195,62 @@ try:
         else:
             st.warning("No hay transacciones para el rango de fechas seleccionado.")
             
-        # --- 7. ZONA DE PELIGRO BLINDADA ---
+        # --- 7. PANEL DE GESTIÓN DE REGISTROS (CRUD) ---
         st.divider()
-        st.subheader("🗑️ Gestión de Errores")
-        with st.expander("Abrir panel de eliminación"):
-            col_borrar1, col_borrar2 = st.columns([3, 1])
-            with col_borrar1:
+        st.subheader("⚙️ Gestión de Registros")
+        
+        # Creamos dos pestañas para separar la lógica
+        tab_editar, tab_borrar = st.tabs(["✏️ Editar Registro", "🗑️ Eliminar Registro"])
+        
+        # --- PESTAÑA: EDITAR ---
+        with tab_editar:
+            st.markdown("¿Te equivocaste al cargar? Ingresá el ID del registro y los datos correctos.")
+            with st.form("form_editar", clear_on_submit=True):
+                col_e1, col_e2, col_e3 = st.columns(3)
+                with col_e1:
+                    id_editar = st.number_input("ID a modificar", min_value=1, step=1, value=None)
+                with col_e2:
+                    # Usamos la lista de categorías (incluyendo Alimentos y Servicios)
+                    nueva_categoria = st.selectbox("Nueva Categoría", list(dict_categorias.keys()))
+                with col_e3:
+                    nuevo_monto = st.number_input("Nuevo Monto ($)", min_value=0.0, value=None, format="%.2f")
+                
+                btn_actualizar = st.form_submit_button("🔄 Actualizar Registro")
+                
+                if btn_actualizar:
+                    if id_editar is None or nuevo_monto is None:
+                        st.error("⚠️ Por favor completá el ID y el nuevo monto.")
+                    else:
+                        id_cat_nueva = dict_categorias[nueva_categoria]
+                        # El comando UPDATE en SQL para cambiar los datos
+                        query_update = text("""
+                            UPDATE Fact_Transacciones 
+                            SET ID_Categoria = :id_cat, Monto = :monto
+                            WHERE ID_Transaccion = :id AND usuario = :usuario_actual
+                        """)
+                        try:
+                            with engine.connect() as conn:
+                                resultado = conn.execute(query_update, {
+                                    "id_cat": id_cat_nueva, 
+                                    "monto": nuevo_monto, 
+                                    "id": id_editar, 
+                                    "usuario_actual": st.session_state['usuario_actual']
+                                })
+                                conn.commit()
+                                
+                                if resultado.rowcount > 0:
+                                    st.success(f"¡Éxito! Registro {id_editar} actualizado. Recargá la página (F5) para ver los cambios.")
+                                else:
+                                    st.error("No se encontró ese ID o no te pertenece.")
+                        except Exception as e:
+                            st.error(f"Error al actualizar: {e}")
+
+        # --- PESTAÑA: BORRAR (Tu código original blindado) ---
+        with tab_borrar:
+            col_b1, col_b2 = st.columns([3, 1])
+            with col_b1:
                 id_a_borrar = st.number_input("Ingresá el ID a eliminar:", min_value=1, step=1, value=None)
-            with col_borrar2:
+            with col_b2:
                 st.write("") 
                 st.write("")
                 btn_eliminar = st.button("🚨 Eliminar")
@@ -211,14 +259,12 @@ try:
                 if id_a_borrar is None:
                     st.error("Ingresá un ID válido.")
                 else:
-                    # BLINDAJE: Solo borra si el ID existe Y le pertenece al usuario actual
                     query_delete = text("DELETE FROM Fact_Transacciones WHERE ID_Transaccion = :id AND usuario = :usuario_actual")
                     try:
                         with engine.connect() as conn:
                             resultado = conn.execute(query_delete, {"id": id_a_borrar, "usuario_actual": st.session_state['usuario_actual']})
                             conn.commit()
                             
-                            # Verificamos si realmente se borró algo
                             if resultado.rowcount > 0:
                                 st.success(f"¡Registro {id_a_borrar} eliminado! Recargá la página (F5).")
                             else:
