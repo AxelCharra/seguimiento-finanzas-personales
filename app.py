@@ -6,6 +6,11 @@ import datetime
 from sqlalchemy import create_engine, text
 import time
 
+# --- FUNCIÓN TRADUCTORA DE FORMATO ---
+def formato_ars(numero):
+    # Toma el numero, lo formatea a US (1,234.56) y luego invierte los signos
+    return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 # --- 1. CONFIGURACIÓN DE STREAMLIT ---
 st.set_page_config(page_title="Mis Finanzas", page_icon="💰", layout="wide")
 
@@ -171,9 +176,9 @@ try:
             saldo_actual = total_ingresos - total_egresos
 
             kpi1, kpi2, kpi3 = st.columns(3)
-            kpi1.metric(label="Ingresos (Período)", value=f"${total_ingresos:,.2f}")
-            kpi2.metric(label="Egresos (Período)", value=f"${total_egresos:,.2f}")
-            kpi3.metric(label="Flujo de Caja", value=f"${saldo_actual:,.2f}")
+            kpi1.metric(label="Ingresos (Período)", value=f"${formato_ars(total_ingresos)}")
+            kpi2.metric(label="Egresos (Período)", value=f"${formato_ars(total_egresos)}")
+            kpi3.metric(label="Flujo de Caja", value=f"${formato_ars(saldo_actual)}")
             
             st.divider()
             st.subheader("📉 Análisis de Gastos")
@@ -191,7 +196,8 @@ try:
 
             st.divider()
             st.subheader("📝 Historial de Transacciones")
-            st.dataframe(df_filtrado, width="stretch")
+            # Le pasamos el formato argentino a la columna Monto
+            st.dataframe(df_filtrado.style.format({"Monto": lambda x: f"${formato_ars(x)}"}), width="stretch")
         else:
             st.warning("No hay transacciones para el rango de fechas seleccionado.")
             
