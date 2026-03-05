@@ -25,7 +25,7 @@ dict_categorias = {
     "Supermercado": 5, "Alquiler": 6, "Gimnasio": 7, "Ocio": 8, 
     "Entretenimiento": 9, "Gustitos": 10, "Bolucompras": 11,
     "Otros Egresos": 12, "Inversiones": 13, "Verdulería": 14, "Indumentaria": 15,
-    "Servicios": 16, "Alimentos": 17
+    "Servicios": 16, "Alimentos": 17, "Deudas": 18
 }
 
 # --- 3. SISTEMA DE LOGIN (GATEKEEPER OPTIMIZADO) ---
@@ -93,7 +93,7 @@ if tipo_movimiento == "Ingreso":
     categorias_disponibles = ["Sueldo", "Rendimientos", "Ventas", "Otros Ingresos"]
 else:
     st.markdown("<h4 style='color: #dc3545;'>📉 Registrando un Egreso</h4>", unsafe_allow_html=True)
-    categorias_disponibles = ["Supermercado", "Alimentos", "Alquiler", "Servicios", "Gimnasio", "Ocio", "Entretenimiento", "Gustitos", "Bolucompras", "Otros Egresos", "Inversiones", "Verdulería", "Indumentaria"]
+    categorias_disponibles = ["Supermercado", "Alimentos", "Alquiler", "Servicios", "Deudas", "Gimnasio", "Ocio", "Entretenimiento", "Gustitos", "Bolucompras", "Otros Egresos", "Inversiones", "Verdulería", "Indumentaria"]
 
 with st.form("formulario_transacciones", clear_on_submit=True):
     col1, col2 = st.columns(2)
