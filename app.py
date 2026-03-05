@@ -202,44 +202,57 @@ try:
         # Creamos dos pestañas para separar la lógica
         tab_editar, tab_borrar = st.tabs(["✏️ Editar Registro", "🗑️ Eliminar Registro"])
         
-        # --- PESTAÑA: EDITAR ---
+       # --- PESTAÑA: EDITAR ---
         with tab_editar:
-            st.markdown("¿Te equivocaste al cargar? Ingresá el ID del registro y los datos correctos.")
+            st.markdown("Reescribí un registro completo. Ingresá el ID y los datos correctos.")
             with st.form("form_editar", clear_on_submit=True):
-                col_e1, col_e2, col_e3 = st.columns(3)
-                with col_e1:
-                    id_editar = st.number_input("ID a modificar", min_value=1, step=1, value=None)
-                with col_e2:
-                    # Usamos la lista de categorías (incluyendo Alimentos y Servicios)
-                    nueva_categoria = st.selectbox("Nueva Categoría", list(dict_categorias.keys()))
-                with col_e3:
-                    nuevo_monto = st.number_input("Nuevo Monto ($)", min_value=0.0, value=None, format="%.2f")
+                st.markdown("**1. Indicá el ID a modificar:**")
+                id_editar = st.number_input("ID de la transacción", min_value=1, step=1, value=None)
                 
-                btn_actualizar = st.form_submit_button("🔄 Actualizar Registro")
+                st.markdown("**2. Ingresá los datos corregidos:**")
+                col_e1, col_e2 = st.columns(2)
+                with col_e1:
+                    nueva_fecha = st.date_input("Nueva Fecha", format="DD/MM/YYYY")
+                    nueva_cuenta = st.selectbox("Nueva Cuenta", list(dict_cuentas.keys()))
+                    nueva_categoria = st.selectbox("Nueva Categoría", list(dict_categorias.keys()))
+                with col_e2:
+                    nuevo_monto = st.number_input("Nuevo Monto ($)", min_value=0.0, value=None, format="%.2f")
+                    nuevo_detalle = st.text_input("Nuevo Detalle", placeholder="Ej: Compra corregida")
+                
+                btn_actualizar = st.form_submit_button("🔄 Actualizar Registro Completo")
                 
                 if btn_actualizar:
                     if id_editar is None or nuevo_monto is None:
-                        st.error("⚠️ Por favor completá el ID y el nuevo monto.")
+                        st.error("⚠️ Por favor completá el ID y el nuevo monto como mínimo.")
                     else:
+                        id_cta_nueva = dict_cuentas[nueva_cuenta]
                         id_cat_nueva = dict_categorias[nueva_categoria]
-                        # El comando UPDATE en SQL para cambiar los datos
+                        
+                        # Expandimos el UPDATE a todas las columnas
                         query_update = text("""
                             UPDATE Fact_Transacciones 
-                            SET ID_Categoria = :id_cat, Monto = :monto
+                            SET Fecha = :fecha,
+                                ID_Cuenta_Origen = :id_cuenta,
+                                ID_Categoria = :id_cat, 
+                                Monto = :monto,
+                                Detalle = :detalle
                             WHERE ID_Transaccion = :id AND usuario = :usuario_actual
                         """)
                         try:
                             with engine.connect() as conn:
                                 resultado = conn.execute(query_update, {
+                                    "fecha": nueva_fecha,
+                                    "id_cuenta": id_cta_nueva,
                                     "id_cat": id_cat_nueva, 
                                     "monto": nuevo_monto, 
+                                    "detalle": nuevo_detalle,
                                     "id": id_editar, 
                                     "usuario_actual": st.session_state['usuario_actual']
                                 })
                                 conn.commit()
                                 
                                 if resultado.rowcount > 0:
-                                    st.success(f"¡Éxito! Registro {id_editar} actualizado. Recargá la página (F5) para ver los cambios.")
+                                    st.success(f"¡Éxito! Registro {id_editar} actualizado por completo. Recargá la página (F5).")
                                 else:
                                     st.error("No se encontró ese ID o no te pertenece.")
                         except Exception as e:
