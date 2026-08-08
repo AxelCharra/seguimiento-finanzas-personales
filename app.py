@@ -34,6 +34,9 @@ cookie_manager = stx.CookieManager()
 # Solo leemos la cookie del usuario
 usuario_cookie = cookie_manager.get(cookie="usuario_finanzas")
 
+if st.session_state.get("forzar_logout", False):
+    usuario_cookie = None
+
 # Si la cookie existe y tiene un nombre, automáticamente está logueado
 if usuario_cookie is not None and usuario_cookie != "":
     st.session_state['logeado'] = True
@@ -57,6 +60,7 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
                 if usuario in st.secrets["credenciales"] and st.secrets["credenciales"][usuario] == password:
                     st.session_state['logeado'] = True
                     st.session_state['usuario_actual'] = usuario 
+                    st.session_state['forzar_logout'] = False
                     
                     vencimiento = datetime.datetime.now() + datetime.timedelta(days=30)
                     
@@ -75,10 +79,9 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
 
 st.sidebar.title(f"Bienvenido/a 👋 {st.session_state['usuario_actual'].capitalize()}")
 if st.sidebar.button("Cerrar Sesión"):
+    st.session_state['forzar_logout'] = True
+    st.session_state['logeado'] = False
     cookie_manager.delete("usuario_finanzas")
-    st.session_state.clear()
-    # Le damos un segundo al CookieManager para que mande la orden de borrado al navegador antes de reiniciar
-    time.sleep(1.2) 
     st.rerun()
 
 st.title("💸 Seguimiento de Finanzas Personales")
