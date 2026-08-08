@@ -83,56 +83,163 @@ st.title("💸 Seguimiento de Finanzas Personales")
 
 st.divider() 
 
-# --- 4. FORMULARIO DE CARGA ---
-st.subheader("Carga una nueva transacción")
-opcion_seleccionada = st.radio("Tipo de Movimiento", ["🔴 Egreso", "🟢 Ingreso"], horizontal=True)
-tipo_movimiento = "Ingreso" if "Ingreso" in opcion_seleccionada else "Egreso"
+# --- 4. CARGA DE TRANSACCIONES ---
+st.subheader("Carga de Transacciones")
 
-if tipo_movimiento == "Ingreso":
-    st.markdown("<h4 style='color: #28a745;'>📈 Registrando un Ingreso</h4>", unsafe_allow_html=True)
-    categorias_disponibles = ["Sueldo", "Rendimientos", "Ventas", "Otros Ingresos"]
-else:
-    st.markdown("<h4 style='color: #dc3545;'>📉 Registrando un Egreso</h4>", unsafe_allow_html=True)
-    categorias_disponibles = ["Supermercado", "Alimentos", "Alquiler", "Servicios", "Deudas", "Gimnasio", "Ocio", "Entretenimiento", "Gustitos", "Bolucompras", "Otros Egresos", "Inversiones", "Verdulería", "Indumentaria"]
+tab_manual, tab_csv = st.tabs(["✍️ Carga Manual", "📁 Subir CSV (MercadoPago)"])
 
-with st.form("formulario_transacciones", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        # 1. Definimos el huso horario de Argentina (UTC-3)
-        zona_ar = datetime.timezone(datetime.timedelta(hours=-3))
-        # 2. Calculamos el "hoy" pero forzando esa zona horaria
-        hoy_arg = datetime.datetime.now(zona_ar).date()
-        # 3. Le pasamos ese "hoy_arg" como valor (value) por defecto al calendario
-        fecha = st.date_input("Fecha de la transacción", value=hoy_arg, format="DD/MM/YYYY")
-        cuenta = st.selectbox("Cuenta", list(dict_cuentas.keys()))
-        categoria = st.selectbox("Categoría", categorias_disponibles)
-    with col2:
-        monto = st.number_input("Monto ($)", min_value=0.0, value=None, format="%.2f")
-        detalle = st.text_input("Detalle (Opcional)", placeholder="Ej: Cena con amigos")
-    boton_guardar = st.form_submit_button("Guardar Transacción")
+with tab_manual:
+    opcion_seleccionada = st.radio("Tipo de Movimiento", ["🔴 Egreso", "🟢 Ingreso"], horizontal=True)
+    tipo_movimiento = "Ingreso" if "Ingreso" in opcion_seleccionada else "Egreso"
 
-# --- 5. LÓGICA DE INYECCIÓN A SQL ---
-if boton_guardar:
-    if monto is None or monto <= 0:
-        st.error("Error: Por favor, ingresá un monto mayor a cero.")
+    if tipo_movimiento == "Ingreso":
+        st.markdown("<h4 style='color: #28a745;'>📈 Registrando un Ingreso</h4>", unsafe_allow_html=True)
+        categorias_disponibles = ["Sueldo", "Rendimientos", "Ventas", "Otros Ingresos"]
     else:
-        id_cuenta = dict_cuentas[cuenta]
-        id_categoria = dict_categorias[categoria]
-        
-        query_insert = text("""
-            INSERT INTO Fact_Transacciones (Fecha, ID_Cuenta_Origen, ID_Categoria, Monto, Detalle, usuario)
-            VALUES (:fecha, :id_cuenta, :id_categoria, :monto, :detalle, :usuario_actual)
-        """)
+        st.markdown("<h4 style='color: #dc3545;'>📉 Registrando un Egreso</h4>", unsafe_allow_html=True)
+        categorias_disponibles = ["Supermercado", "Alimentos", "Alquiler", "Servicios", "Deudas", "Gimnasio", "Ocio", "Entretenimiento", "Gustitos", "Bolucompras", "Otros Egresos", "Inversiones", "Verdulería", "Indumentaria"]
+
+    with st.form("formulario_transacciones", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            zona_ar = datetime.timezone(datetime.timedelta(hours=-3))
+            hoy_arg = datetime.datetime.now(zona_ar).date()
+            fecha = st.date_input("Fecha de la transacción", value=hoy_arg, format="DD/MM/YYYY")
+            cuenta = st.selectbox("Cuenta", list(dict_cuentas.keys()))
+            categoria = st.selectbox("Categoría", categorias_disponibles)
+        with col2:
+            monto = st.number_input("Monto ($)", min_value=0.0, value=None, format="%.2f")
+            detalle = st.text_input("Detalle (Opcional)", placeholder="Ej: Cena con amigos")
+        boton_guardar = st.form_submit_button("Guardar Transacción")
+
+    if boton_guardar:
+        if monto is None or monto <= 0:
+            st.error("Error: Por favor, ingresá un monto mayor a cero.")
+        else:
+            id_cuenta = dict_cuentas[cuenta]
+            id_categoria = dict_categorias[categoria]
+            
+            query_insert = text("""
+                INSERT INTO Fact_Transacciones (Fecha, ID_Cuenta_Origen, ID_Categoria, Monto, Detalle, usuario)
+                VALUES (:fecha, :id_cuenta, :id_categoria, :monto, :detalle, :usuario_actual)
+            """)
+            try:
+                with engine.connect() as conn:
+                    conn.execute(query_insert, {
+                        "fecha": fecha, "id_cuenta": id_cuenta, "id_categoria": id_categoria, 
+                        "monto": monto, "detalle": detalle, "usuario_actual": st.session_state['usuario_actual']
+                    })
+                    conn.commit()
+                st.success(f"¡Éxito! Transacción guardada en tu cuenta.")
+            except Exception as e:
+                st.error(f"Error al guardar: {e}")
+
+with tab_csv:
+    st.markdown("Subí tu archivo **CSV de MercadoPago** para cargar gastos masivamente.")
+    archivo_csv = st.file_uploader("Seleccionar CSV", type=["csv"])
+    
+    if archivo_csv is not None:
         try:
-            with engine.connect() as conn:
-                conn.execute(query_insert, {
-                    "fecha": fecha, "id_cuenta": id_cuenta, "id_categoria": id_categoria, 
-                    "monto": monto, "detalle": detalle, "usuario_actual": st.session_state['usuario_actual']
-                })
-                conn.commit()
-            st.success(f"¡Éxito! Transacción guardada en tu cuenta.")
+            # Intentar leer asumiendo el formato estándar, salteando posibles filas de encabezado basura si las hay
+            df_csv = pd.read_csv(archivo_csv)
+            
+            # Buscamos columnas clave (ignorando mayúsculas/minúsculas)
+            cols = [c.lower() for c in df_csv.columns]
+            
+            # Armar un DataFrame limpio para previsualizar y editar
+            # En MP generalmente las fechas vienen con hora. Trataremos de parsearlas.
+            df_limpio = pd.DataFrame()
+            
+            if "fecha" in cols:
+                df_limpio["Fecha"] = pd.to_datetime(df_csv.iloc[:, cols.index("fecha")], errors='coerce').dt.date
+            else:
+                df_limpio["Fecha"] = datetime.datetime.now().date()
+                
+            # Buscar columna de monto/importe
+            if "importe" in cols:
+                monto_col = cols.index("importe")
+            elif "monto" in cols:
+                monto_col = cols.index("monto")
+            else:
+                monto_col = None
+                
+            if monto_col is not None:
+                # Convertir a float. MP suele usar negativos para egresos.
+                montos = pd.to_numeric(df_csv.iloc[:, monto_col], errors='coerce')
+                # Asignamos todo a monto absoluto y determinamos si es egreso o ingreso
+                df_limpio["Monto"] = montos.abs()
+                df_limpio["Tipo"] = montos.apply(lambda x: "Egreso" if x < 0 else "Ingreso")
+            else:
+                df_limpio["Monto"] = 0.0
+                df_limpio["Tipo"] = "Egreso"
+                
+            # Detalle
+            if "detalle" in cols:
+                df_limpio["Detalle"] = df_csv.iloc[:, cols.index("detalle")].fillna("")
+            elif "concepto" in cols:
+                df_limpio["Detalle"] = df_csv.iloc[:, cols.index("concepto")].fillna("")
+            else:
+                df_limpio["Detalle"] = "Importado CSV"
+                
+            # Autocategorización básica
+            def asignar_categoria(detalle):
+                detalle_lower = str(detalle).lower()
+                if "coto" in detalle_lower or "carrefour" in detalle_lower or "dia " in detalle_lower:
+                    return "Supermercado"
+                if "netflix" in detalle_lower or "spotify" in detalle_lower:
+                    return "Entretenimiento"
+                if "transferencia" in detalle_lower:
+                    return "Otros Egresos"
+                return "Otros Egresos" # Por defecto
+                
+            df_limpio["Categoría"] = df_limpio["Detalle"].apply(asignar_categoria)
+            df_limpio["Cuenta"] = "MercadoPago"
+            df_limpio["Importar"] = True
+            
+            st.info("Revisá y modificá los datos antes de inyectarlos a la base de datos:")
+            
+            # Usar st.data_editor para permitir correcciones
+            df_editado = st.data_editor(
+                df_limpio, 
+                column_config={
+                    "Importar": st.column_config.CheckboxColumn("¿Importar?", default=True),
+                    "Categoría": st.column_config.SelectboxColumn("Categoría", options=list(dict_categorias.keys())),
+                    "Cuenta": st.column_config.SelectboxColumn("Cuenta", options=list(dict_cuentas.keys())),
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            if st.button("🚀 Cargar a la Base de Datos"):
+                df_a_importar = df_editado[df_editado["Importar"] == True]
+                exitosos = 0
+                
+                with engine.connect() as conn:
+                    for index, row in df_a_importar.iterrows():
+                        id_cuenta = dict_cuentas.get(row["Cuenta"], 3) # 3 es MP por defecto
+                        id_categoria = dict_categorias.get(row["Categoría"], 12) # 12 Otros Egresos
+                        
+                        query_masiva = text("""
+                            INSERT INTO Fact_Transacciones (Fecha, ID_Cuenta_Origen, ID_Categoria, Monto, Detalle, usuario)
+                            VALUES (:fecha, :id_cuenta, :id_categoria, :monto, :detalle, :usuario_actual)
+                        """)
+                        try:
+                            conn.execute(query_masiva, {
+                                "fecha": row["Fecha"],
+                                "id_cuenta": id_cuenta, 
+                                "id_categoria": id_categoria,
+                                "monto": row["Monto"],
+                                "detalle": row["Detalle"],
+                                "usuario_actual": st.session_state['usuario_actual']
+                            })
+                            exitosos += 1
+                        except Exception as e:
+                            st.warning(f"Error en fila {index}: {e}")
+                    conn.commit()
+                st.success(f"¡Se importaron {exitosos} transacciones correctamente! (Apretá F5 para ver los cambios)")
+                
         except Exception as e:
-            st.error(f"Error al guardar: {e}")
+            st.error(f"No pudimos interpretar el archivo. Asegurate de que sea un CSV válido. Error técnico: {e}")
 
 st.divider()
 
