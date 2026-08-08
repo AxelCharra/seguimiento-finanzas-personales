@@ -75,8 +75,10 @@ if 'logeado' not in st.session_state or not st.session_state['logeado']:
 
 st.sidebar.title(f"Bienvenido/a 👋 {st.session_state['usuario_actual'].capitalize()}")
 if st.sidebar.button("Cerrar Sesión"):
-    st.session_state['logeado'] = False
-    cookie_manager.delete("usuario_finanzas") # Borramos la única cookie al salir
+    cookie_manager.delete("usuario_finanzas")
+    st.session_state.clear()
+    # Le damos un segundo al CookieManager para que mande la orden de borrado al navegador antes de reiniciar
+    time.sleep(1.2) 
     st.rerun()
 
 st.title("💸 Seguimiento de Finanzas Personales")
