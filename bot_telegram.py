@@ -17,15 +17,15 @@ try:
     DB_URI = secrets["DB_URI"]
     # NOTA: En el proximo paso le diremos al usuario que agregue esto en secrets.toml
     if "TELEGRAM_TOKEN" not in secrets:
-        print("🚨 ATENCIÓN: Falta agregar TELEGRAM_TOKEN y TELEGRAM_USER_ID en .streamlit/secrets.toml")
+        print("ATENCION: Falta agregar TELEGRAM_TOKEN y TELEGRAM_USER_ID en .streamlit/secrets.toml")
         TELEGRAM_TOKEN = "AQUI_IRÁ_EL_TOKEN"
         ALLOWED_USER_ID = 0
     else:
         TELEGRAM_TOKEN = secrets["TELEGRAM_TOKEN"]
         ALLOWED_USER_ID = int(secrets["TELEGRAM_USER_ID"])
         
-    # Extraemos el primer usuario del diccionario de credenciales como el dueño por defecto de estos gastos
-    USUARIO_APP = list(secrets["credenciales"].keys())[0] if "credenciales" in secrets else "Usuario"
+    # Leemos a qué usuario de la app le corresponden los gastos enviados desde este ID de Telegram
+    USUARIO_APP = secrets.get("TELEGRAM_APP_USER", "Usuario")
     
 except Exception as e:
     print(f"Error cargando secrets.toml: {e}")
@@ -125,7 +125,7 @@ def main():
     # Responder a cualquier mensaje de texto
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("🤖 Bot de Finanzas en funcionamiento. Esperando mensajes...")
+    print("Bot de Finanzas en funcionamiento. Esperando mensajes...")
     
     # Iniciar "Polling" (escucha activa)
     application.run_polling(allowed_updates=Update.ALL_TYPES)
